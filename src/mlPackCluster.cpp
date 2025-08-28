@@ -4,6 +4,7 @@
 #include <vector>
 #include <mlpack/core.hpp>
 #include <mlpack/methods/kmeans/kmeans.hpp>
+#include <mlpack/methods/dbscan/dbscan.hpp>
 #include <mlpack/methods/gmm/gmm.hpp>
 #include <mlpack/methods/mean_shift/mean_shift.hpp>
 #include <filesystem>
@@ -65,6 +66,67 @@ void kmeanClustering(const arma::mat& inputs,
   PlotClusters(plot_clusters, "K-Means", name + "-kmeans.png");
 }
 
+void DBScanClustering(const arma::mat& inputs, const std::string& name){
+
+    // Perform DBSCAN clustering
+    arma::Row<size_t> assignments;
+    DBSCAN<> dbscan(0.1, 15);
+    dbscan.Cluster(inputs, assignments);
+
+    Clusters plot_clusters;
+    for (size_t i = 0; i != inputs.n_cols; ++i) {
+        auto cluster_idx = assignments[i];
+        plot_clusters[cluster_idx].first.push_back(inputs.at(0, i));
+        plot_clusters[cluster_idx].second.push_back(inputs.at(1, i));
+    }
+
+  PlotClusters(plot_clusters, "DBSCAN", name + "-dbscan.png");
+}
+
+void DMeanShiftClustering(const arma::mat& inputs,
+                   const std::string& name){
+
+    // Perform Mean Shift clustering
+    arma::Row<size_t> assignments;
+    arma::mat centroids;
+
+    MeanShift<> meanshift;
+    auto radius = meanshift.EstimateRadius(inputs);
+    meanshift.Radius(radius);
+    meanshift.Cluster(inputs, assignments, centroids);
+
+    Clusters plot_clusters;
+    for (size_t i = 0; i != inputs.n_cols; ++i) {
+        auto cluster_idx = assignments[i];
+        plot_clusters[cluster_idx].first.push_back(inputs.at(0, i));
+        plot_clusters[cluster_idx].second.push_back(inputs.at(1, i));
+    }
+
+  PlotClusters(plot_clusters, "Mean Shift", name + "-meanshift.png");
+}
+
+void GMMClustering(const arma::mat& inputs, size_t num_clusters, const std::string& name){
+    GMM gmm(num_clusters,2);
+
+    KMeans<> kmeans;
+    size_t max_iterations = 250;
+    double tolerance = 1e-10;
+    EMFit<KMeans<>, NoConstraint> em(max_iterations, tolerance, kmeans);
+    gmm.Train(inputs, 3, false, em);
+     
+    arma::Row<size_t> assignments;
+    gmm.Classify(inputs, assignments);
+
+    Clusters plot_clusters;
+    for (size_t i = 0; i != inputs.n_cols; ++i) {
+        auto cluster_idx = assignments[i];
+        plot_clusters[cluster_idx].first.push_back(inputs.at(0, i));
+        plot_clusters[cluster_idx].second.push_back(inputs.at(1, i));
+    }
+    PlotClusters(plot_clusters, "GMM", name + "-gmm.png");
+}
+
+
 namespace fs = std::filesystem;
 int main(int argc, char** argv){
     if(argc <=1){
@@ -108,6 +170,10 @@ int main(int argc, char** argv){
                   << " num clusters: " << num_clusters << std::endl;
 
         kmeanClustering(dataset, num_clusters, dataset_name);
+        DBScanClustering(dataset, dataset_name);
+        DMeanShiftClustering(dataset, dataset_name);
+
+        GMMClustering(dataset, num_clusters, dataset_name);
     }
 
     return 0;
